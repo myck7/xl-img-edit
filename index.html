@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Large Image Crop & Replace</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #111;
+      color: #fff;
+      padding: 20px;
+    }
+    canvas {
+      border: 1px solid #444;
+      cursor: crosshair;
+      max-width: 100%;
+    }
+    button {
+      margin: 10px 5px;
+      padding: 8px 14px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+<h2>Large Image Crop & Replace Tool</h2>
+
+<input type="file" id="uploadOriginal" accept="image/*"><br><br>
+
+<canvas id="canvas"></canvas><br>
+
+<button id="cropBtn">Crop & Download</button>
+<input type="file" id="uploadEdited" accept="image/*">
+<button id="replaceBtn">Replace Edited Part</button>
+
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+let originalImage = new Image();
+let isSelecting = false;
+let startX, startY, endX, endY;
+let cropData = null;
+
+document.getElementById("uploadOriginal").addEventListener("change", e => {
+  const file = e.target.files[0];
+  const reader = new FileReader();
+
+  reader.onload = () => {
+    originalImage.onload = () => {
+      canvas.width = originalImage.width;
+      canvas.height = originalImage.height;
+      ctx.drawImage(originalImage, 0, 0);
+    };
+    originalImage.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+});
+
+canvas.addEventListener("mousedown", e => {
+  isSelecting = true;
+  startX = e.offsetX;
+  startY = e.offsetY;
+});
+
+canvas.addEventListener("mousemove", e => {
+  if (!isSelecting) return;
+  endX = e.offsetX;
+  endY = e.offsetY;
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(originalImage, 0, 0);
+
+  ctx.strokeStyle = "red";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(
+    startX,
+    startY,
+    endX - startX,
+    endY - startY
+  );
+});
+
+canvas.addEventListener("mouseup", () => {
+  isSelecting = false;
+
+  cropData = {
+    x: Math.min(startX, endX),
+    y: Math.min(startY, endY),
+    w: Math.abs(endX - startX),
+    h: Math.abs(endY - startY)
+  };
+});
+
+document.getElementById("cropBtn").addEventListener("click", () => {
+  if (!cropData) return alert("No area selected");
+
+  const cropCanvas = document.createElement("canvas");
+  cropCanvas.width = cropData.w;
+  cropCanvas.height = cropData.h;
+
+  cropCanvas.getContext("2d").drawImage(
+    canvas,
+    cropData.x, cropData.y, cropData.w, cropData.h,
+    0, 0, cropData.w, cropData.h
+  );
+
+  cropCanvas.toBlob(blob => {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "crop.png";
+    a.click();
+  });
+});
+
+document.getElementById("replaceBtn").addEventListener("click", () => {
+  if (!cropData) return alert("No crop data");
+
+  const fileInput = document.getElementById("uploadEdited");
+  if (!fileInput.files[0]) return alert("Upload edited image");
+
+  const editedImg = new Image();
+  const reader = new FileReader();
+
+  reader.onload = () => {
+    editedImg.onload = () => {
+      ctx.drawImage(
+        editedImg,
+        cropData.x,
+        cropData.y,
+        cropData.w,
+        cropData.h
+      );
+    };
+    editedImg.src = reader.result;
+  };
+  reader.readAsDataURL(fileInput.files[0]);
+});
+</script>
+
+</body>
+</html>
